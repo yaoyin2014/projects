@@ -72,7 +72,7 @@ function getMaxScroll() {
 }
 
 const HINT_MIN_WIDTH = 36
-const HINT_MAX_WIDTH = 120
+const HINT_MAX_WIDTH = 80
 
 // 当前提示区域的宽度：随拖拽距离直接拉伸，填满右侧间隙
 const hintWidth = computed(() => {
@@ -81,9 +81,12 @@ const hintWidth = computed(() => {
 })
 
 const trackStyle = computed(() => {
-  // 提示区拉伸填掉了拖拽间隙，无需额外补偿
-  // |pullOffset| = extraWidth，右侧始终贴边
-  const base = translateX.value + pullOffset.value
+  // 提示区拉伸填掉拖拽间隙；超出 HINT_MAX_WIDTH 的部分需补偿
+  const absPull = Math.abs(pullOffset.value)
+  const maxHintGrow = HINT_MAX_WIDTH - HINT_MIN_WIDTH
+  const overflow = Math.max(0, absPull - maxHintGrow)
+  // pullOffset 为负，overflow 为正，抵消超出部分，保持右侧贴边
+  const base = translateX.value + pullOffset.value + overflow
   return {
     transform: `translateX(${base}px)`,
     transition: isAnimating.value ? 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
