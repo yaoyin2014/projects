@@ -2,12 +2,15 @@
   <div
     class="swipe-container"
     ref="containerRef"
-    @scroll="onScroll"
     @touchstart="onTouchStart"
-    @touchmove="onTouchMove"
+    @touchmove.prevent="onTouchMove"
     @touchend="onTouchEnd"
   >
-    <div class="swipe-track">
+    <div
+      class="swipe-track"
+      ref="trackRef"
+      :style="trackStyle"
+    >
       <!-- 4 张图片 -->
       <div
         v-for="(img, index) in images"
@@ -20,19 +23,19 @@
       <!-- 提示文字区域（在最后一张图片后面） -->
       <div
         class="swipe-hint"
-        :class="{ active: isAtEnd }"
+        :class="{ active: isPulling }"
+        :style="hintStyle"
         @click.stop="onClickHint"
       >
-        <span>{{ isAtEnd ? '松开查看' : '左滑查看更多' }}</span>
+        <span>{{ isPulling ? '松开查看' : '左滑查看更多' }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 
-// 示例图片（可替换为实际图片地址）
 const images = ref([
   'https://picsum.photos/180/240?random=1',
   'https://picsum.photos/180/240?random=2',
@@ -41,56 +44,151 @@ const images = ref([
 ])
 
 const containerRef = ref(null)
-const isAtEnd = ref(false)
+const trackRef = ref(null)
+const isPulling = ref(false)
+const pullOffset = ref(0)       // 超出右边界后的拖拽距离
+const translateX = ref(0)       // 正常滚动偏移
+const isAnimating = ref(false)
 
-// 记录 touchmove 过程中是否到达过最右侧
-let reachedEndInCurrentSwipe = false
-// 防止 touchend 触发 alert 后 click 再次触发
+const THRESHOLD = 0             // 进入拖拽状态的阈值（一拉就显示）
+const THRESHOLD_RELEASE = 0     // 退出拖拽状态的阈值
+const MAX_PULL = 120            // 最大拖拽距离
 let alertTriggered = false
 
-// 判断是否滚动到了最右侧
-function checkAtEnd() {
-  const el = containerRef.value
-  if (!el) return false
-  // 允许 2px 误差
-  return el.scrollLeft + el.clientWidth >= el.scrollWidth - 2
+// 触摸记录
+let startX = 0
+let startY = 0
+let lastX = 0
+let currentTranslateX = 0
+let atRightEdge = false
+
+// 计算可滚动的最大距离
+function getMaxScroll() {
+  const container = containerRef.value
+  const track = trackRef.value
+  if (!container || !track) return 0
+  return -(track.scrollWidth - container.clientWidth)
 }
 
-function onScroll() {
-  const atEnd = checkAtEnd()
-  // 只在到达最右侧且当前这次滑动中才更新状态
-  if (atEnd && reachedEndInCurrentSwipe) {
-    isAtEnd.value = true
-  } else if (!atEnd) {
-    isAtEnd.value = false
+const HINT_MIN_WIDTH = 36
+const HINT_MAX_WIDTH = 120
+
+// 当前提示区域的宽度：随拖拽距离直接拉伸，填满右侧间隙
+const hintWidth = computed(() => {
+  const raw = HINT_MIN_WIDTH + Math.abs(pullOffset.value)
+  return Math.min(raw, HINT_MAX_WIDTH)
+})
+
+const trackStyle = computed(() => {
+  // 提示区拉伸填掉了拖拽间隙，无需额外补偿
+  // |pullOffset| = extraWidth，右侧始终贴边
+  const base = translateX.value + pullOffset.value
+  return {
+    transform: `translateX(${base}px)`,
+    transition: isAnimating.value ? 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none',
   }
-}
+})
 
-function onTouchStart() {
-  reachedEndInCurrentSwipe = false
+const hintStyle = computed(() => ({
+  width: `${hintWidth.value}px`,
+}))
+
+function onTouchStart(e) {
+  const touch = e.touches[0]
+  startX = touch.clientX
+  startY = touch.clientY
+  lastX = startX
+  currentTranslateX = translateX.value
+  atRightEdge = currentTranslateX <= getMaxScroll()
+  isAnimating.value = false
+  pullOffset.value = 0
+  isPulling.value = false
   alertTriggered = false
-  isAtEnd.value = false
 }
 
-function onTouchMove() {
-  // 标识本轮滑动有效（只要是 touchmove 就认为在滑动中）
-  reachedEndInCurrentSwipe = true
+function onTouchMove(e) {
+  const touch = e.touches[0]
+  const deltaX = touch.clientX - lastX
+  const totalDeltaX = touch.clientX - startX
 
-  // 实时检测是否滑到最右侧
-  const atEnd = checkAtEnd()
-  isAtEnd.value = atEnd
+  // 判断是否在主滚动区域内（未到右边界，或向右回滑）
+  if (!atRightEdge) {
+    // 正常滚动
+    const maxScroll = getMaxScroll()
+    let newX = currentTranslateX + totalDeltaX
+
+    // 限制在有效范围
+    if (newX > 0) newX = 0
+    if (newX < maxScroll) {
+      // 到达右边界，进入拖拽模式
+      atRightEdge = true
+      pullOffset.value = 0
+      translateX.value = maxScroll
+    } else {
+      translateX.value = newX
+    }
+  }
+
+  // 在右边界时的拖拽效果
+  if (atRightEdge) {
+    // 计算超过边界的距离
+    const maxScroll = getMaxScroll()
+    const overflowDelta = totalDeltaX - (maxScroll - currentTranslateX)
+
+    if (overflowDelta < 0) {
+      // 橡皮筋阻尼效果：越拉阻力越大
+      const rawPull = Math.abs(overflowDelta)
+      const pull = rawPull < MAX_PULL
+        ? rawPull * (1 - rawPull / (MAX_PULL * 2.5))
+        : MAX_PULL * 0.6
+
+      pullOffset.value = -pull
+    } else if (overflowDelta > 0) {
+      // 向右回滑，减少拖拽距离
+      const rawPull = Math.abs(overflowDelta)
+      pullOffset.value = -Math.max(0, Math.abs(pullOffset.value) - rawPull)
+
+      // 如果拖拽完全回弹，回到正常滚动
+      if (Math.abs(pullOffset.value) <= 0) {
+        pullOffset.value = 0
+        atRightEdge = false
+        translateX.value = maxScroll + overflowDelta
+        if (translateX.value > 0) translateX.value = 0
+      }
+    }
+
+    // 滞回判断：进入需超过 THRESHOLD，退出需低于 THRESHOLD_RELEASE，防止闪烁
+    const offset = Math.abs(pullOffset.value)
+    if (!isPulling.value && offset >= THRESHOLD) {
+      isPulling.value = true
+    } else if (isPulling.value && offset <= THRESHOLD_RELEASE) {
+      isPulling.value = false
+    }
+  }
+
+  lastX = touch.clientX
 }
 
 function onTouchEnd() {
-  // 只有滑动到最右侧后松手才触发
-  if (isAtEnd.value && !alertTriggered) {
+  isAnimating.value = true
+
+  if (isPulling.value && !alertTriggered) {
     alertTriggered = true
-    alert('查看更多内容！')
+    // 延迟 alert，等回弹动画开始后再弹出
+    setTimeout(() => {
+      alert('查看更多内容！')
+    }, 100)
   }
 
-  // 重置状态
-  isAtEnd.value = false
-  reachedEndInCurrentSwipe = false
+  // 回弹归位
+  pullOffset.value = 0
+  isPulling.value = false
+  atRightEdge = false
+
+  // 动画结束后重置
+  setTimeout(() => {
+    isAnimating.value = false
+  }, 400)
 }
 
 function onClickHint() {
@@ -102,24 +200,19 @@ function onClickHint() {
 
 <style scoped>
 .swipe-container {
-  overflow-x: auto;
-  overflow-y: hidden;
+  position: relative;
+  overflow: hidden;
   width: 100%;
-  /* 隐藏滚动条 */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.swipe-container::-webkit-scrollbar {
-  display: none;
+  height: 240px;
 }
 
 .swipe-track {
   display: flex;
   align-items: center;
+  height: 100%;
   user-select: none;
   -webkit-user-select: none;
+  will-change: transform;
 }
 
 .swipe-item {
@@ -136,7 +229,6 @@ function onClickHint() {
   height: 100%;
   object-fit: cover;
   display: block;
-  /* 禁止图片拖拽 */
   pointer-events: none;
   -webkit-user-drag: none;
 }
@@ -153,11 +245,13 @@ function onClickHint() {
   line-height: 1.6;
   writing-mode: vertical-lr;
   letter-spacing: 2px;
-  transition: color 0.2s, font-weight 0.2s;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  transition: none;
 }
 
 .swipe-hint.active {
-  color: #ff4d4f;
   font-weight: bold;
+  border-radius: 30px 4px 4px 30px;
 }
 </style>
