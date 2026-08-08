@@ -60,6 +60,7 @@ let startX = 0
 let startY = 0
 let lastX = 0
 let currentTranslateX = 0
+let cachedMaxScroll = 0     // touchstart 时缓存的 maxScroll，防止拖拽中 layout 变化干扰计算
 let atRightEdge = false
 
 // 计算可滚动的最大距离
@@ -99,7 +100,8 @@ function onTouchStart(e) {
   startY = touch.clientY
   lastX = startX
   currentTranslateX = translateX.value
-  atRightEdge = currentTranslateX <= getMaxScroll()
+  cachedMaxScroll = getMaxScroll()
+  atRightEdge = currentTranslateX <= cachedMaxScroll
   isAnimating.value = false
   pullOffset.value = 0
   isPulling.value = false
@@ -114,16 +116,15 @@ function onTouchMove(e) {
   // 判断是否在主滚动区域内（未到右边界，或向右回滑）
   if (!atRightEdge) {
     // 正常滚动
-    const maxScroll = getMaxScroll()
     let newX = currentTranslateX + totalDeltaX
 
     // 限制在有效范围
     if (newX > 0) newX = 0
-    if (newX < maxScroll) {
+    if (newX < cachedMaxScroll) {
       // 到达右边界，进入拖拽模式
       atRightEdge = true
       pullOffset.value = 0
-      translateX.value = maxScroll
+      translateX.value = cachedMaxScroll
     } else {
       translateX.value = newX
     }
@@ -131,9 +132,8 @@ function onTouchMove(e) {
 
   // 在右边界时的拖拽效果
   if (atRightEdge) {
-    // 计算超过边界的距离
-    const maxScroll = getMaxScroll()
-    const overflowDelta = totalDeltaX - (maxScroll - currentTranslateX)
+    // 计算超过边界的距离（使用缓存的 maxScroll，避免 hint 宽度变化干扰）
+    const overflowDelta = totalDeltaX - (cachedMaxScroll - currentTranslateX)
 
     if (overflowDelta < 0) {
       // 橡皮筋阻尼效果：越拉阻力越大
@@ -152,7 +152,7 @@ function onTouchMove(e) {
       if (Math.abs(pullOffset.value) <= 0) {
         pullOffset.value = 0
         atRightEdge = false
-        translateX.value = maxScroll + overflowDelta
+        translateX.value = cachedMaxScroll + overflowDelta
         if (translateX.value > 0) translateX.value = 0
       }
     }
