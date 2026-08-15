@@ -4,9 +4,10 @@ import MediaCard from '../components/MediaCard.vue'
 import { useResponsiveColumns, HEIGHT, GAP } from '../composables/useResponsiveColumns'
 import { useInfiniteScroll } from '../composables/useInfiniteScroll'
 import { useScrollAnchor } from '../composables/useScrollAnchor'
+import { observeCardVisibility } from '../utils/observeCardVisibility'
 
 const SIZES = ['small', 'medium', 'large', 'xlarge']
-let nextId = 0
+let nextId = 1
 
 function genBatch(n) {
   const batch = []
@@ -40,12 +41,17 @@ const { loading, finished, loadMore, setupObserver, teardown: teardownScroll } =
 // Grid 用 2px 基准行（HEIGHT+GAP 皆为偶数），span = (高度+间隙)/2
 const spanOf = (it) => (HEIGHT[it.size] + GAP) / 2
 
+let visibilityWatcher = null
+
 onMounted(() => {
   setupColumns()
   loadMore() // 首批；triggerDistance 变化会触发 watch 重建 observer
+  // 监听每个卡片的可见性（调试）：≥1px 可见 / 完全不可见 各打一条日志
+  visibilityWatcher = observeCardVisibility()
 })
 
 onBeforeUnmount(() => {
+  visibilityWatcher?.teardown()
   teardownColumns()
   teardownScroll()
 })
