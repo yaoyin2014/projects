@@ -14,13 +14,16 @@ export function useScrollAnchor({ wrapRef, isNarrow }) {
     // 可见区顶部（视口坐标）：嵌套容器用其 getBoundingClientRect().top，视口滚动则为 0
     const scrollerTop = scroller ? scroller.getBoundingClientRect().top : 0
     let anchorEl = null
-    let anchorTop = Infinity
-    // grid 下 DOM 顺序 ≠ 视觉顺序，必须按 rect.top 找视觉顶部那张卡，不能按 DOM 顺序取第一个
+    let anchorDist = Infinity
+    // grid 下 DOM 顺序 ≠ 视觉顺序，必须按 rect.top 找视觉顶部那张卡，不能按 DOM 顺序取第一个。
+    // 选「top 最接近 scrollerTop」而非「top 最小」：避免选中只露 1px 的 sliver；
+    // 恢复后锚点卡 top≈0、|top-scrollerTop|≈0 恒最小，多次翻转置顶卡稳定、不在两列间漂。
     for (const el of wrapEl.querySelectorAll('[data-id]')) {
       const rect = el.getBoundingClientRect()
       if (rect.bottom <= scrollerTop) continue // 完全在视口上方
-      if (rect.top < anchorTop) {
-        anchorTop = rect.top
+      const dist = Math.abs(rect.top - scrollerTop)
+      if (dist < anchorDist) {
+        anchorDist = dist
         anchorEl = el
       }
     }
