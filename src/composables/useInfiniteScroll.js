@@ -61,6 +61,9 @@ export function useInfiniteScroll({ items, split, wrapRef, sentinelRef, genBatch
     observer = null
   }
 
+  // 列模式切换（单↔双）会改变 triggerDistance → 重建 observer；新 observe 的哨兵会 fire 一次初始回调。
+  // 但该回调在 nextTick 之后投递，看到的是 useScrollAnchor 恢复后的位置（非钳制到底部的瞬态），
+  // 因此只在「恢复后确实接近底部」时才触发 loadMore——属合理预取，无副作用（设计文档 §8.1）。
   watch(triggerDistance, () => setupObserver())
 
   return { loading, finished, triggerDistance, loadMore, setupObserver, teardown }

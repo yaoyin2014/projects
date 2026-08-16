@@ -44,7 +44,10 @@ export function useScrollAnchor({ wrapRef, isNarrow }) {
   watch(isNarrow, () => {
     // flush 默认 'pre'：此刻 DOM 还是旧布局（重排尚未发生），同步捕获锚点
     anchorId = findFirstVisibleCard()
-    // 重排后（post-flush）滚回；多次跨断点只保留最新一次（anchorId 被覆盖）
+    // 重排后（post-flush）滚回；多次跨断点只保留最新一次（anchorId 被覆盖）。
+    // 关键时序：nextTick 是微任务，先于 IntersectionObserver 回调（update the rendering 阶段）执行，
+    // 所以 useInfiniteScroll 重建 observer 后、IO 对哨兵算初始交叉时，看到的是这里恢复后的位置，
+    // 而非内容减半被浏览器钳制到底部的瞬态——避免翻转被误判为「滚到底部」而误触发 loadMore。
     nextTick(() => restore(anchorId))
   })
 
