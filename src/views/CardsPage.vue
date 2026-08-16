@@ -38,7 +38,8 @@ useScrollAnchor({ wrapRef, isNarrow })
 const { loading, finished, loadMore, setupObserver, teardown: teardownScroll } =
   useInfiniteScroll({ items, split, wrapRef, sentinelRef, genBatch })
 
-// Grid 用 2px 基准行（HEIGHT+GAP 皆为偶数），span = (高度+间隙)/2
+// Grid 用 2px 基准行：span = (高度+间隙)/2 必须是整数 → HEIGHT+GAP 必须为偶数
+// （即「卡片高度与垂直间隔同奇偶」，两者都偶数即满足）。水平间隔 column-gap 无此约束。
 const spanOf = (it) => (HEIGHT[it.size] + GAP) / 2
 
 let visibilityWatcher = null

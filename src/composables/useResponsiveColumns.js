@@ -1,6 +1,9 @@
 import { ref, computed } from 'vue'
 
 // 卡片整体高度（px）与间隙，供 Grid span 与触发距离复用。
+// 奇偶约束：span = (HEIGHT+GAP)/2 必须是整数 → HEIGHT+GAP 必须为偶数，
+// 即「卡片高度与垂直间隔同奇偶」。此处两者都取偶数（最简洁）。
+// 水平间隔（column-gap）无此约束——它不进 grid-row 的 span，也不进触发距离计算。
 export const HEIGHT = { small: 110, medium: 150, large: 230, xlarge: 370 }
 export const GAP = 8
 
