@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { cardId } from '../utils/cardId'
 
 defineProps({
   item: { type: Object, required: true },
@@ -12,7 +13,7 @@ const failed = ref(false)
   <article
     class="card"
     :class="[`card--${item.size}`, { 'is-failed': failed }]"
-    :data-id="item.id"
+    :id="cardId(item.id)"
   >
     <img
       v-if="!failed"

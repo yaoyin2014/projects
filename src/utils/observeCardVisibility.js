@@ -3,11 +3,13 @@
 //   卡片有 ≥1px 进入视口 → isIntersecting = true  → 打印「可见」
 //   卡片完全离开视口   → isIntersecting = false → 打印「不可见」
 
+import { CARD_ID_SELECTOR, fromCardId } from './cardId'
+
 export function observeCardVisibility({
   root = null,                       // 滚动根，默认视口（root: null）
-  selector = '[data-id]',            // 卡片选择器（MediaCard 上有 data-id 属性）
+  selector = CARD_ID_SELECTOR,       // 卡片选择器（MediaCard 上挂的原生 id，feedTracker- 前缀）
   container = document.body,         // 扫描范围；动态新增的卡片也会被自动接管
-  getLabel = (el) => el.dataset.id,  // 日志里的卡片标识，默认取 data-id
+  getLabel = (el) => fromCardId(el.id), // 日志里的卡片标识，去掉 feedTracker- 前缀取原始编号
 } = {}) {
   const observer = new IntersectionObserver(
     (entries) => {

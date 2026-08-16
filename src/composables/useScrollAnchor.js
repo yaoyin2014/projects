@@ -1,5 +1,6 @@
 import { watch, nextTick } from 'vue'
 import { resolveScrollRoot } from './useScrollContainer'
+import { CARD_ID_SELECTOR } from '../utils/cardId'
 
 // 列模式切换（单列↔双列）时的滚动锚点保留。
 // 单列内容高度约翻倍，而 scrollTop 是像素值，重排后同一像素会落到不同内容上；
@@ -18,7 +19,7 @@ export function useScrollAnchor({ wrapRef, isNarrow }) {
     // grid 下 DOM 顺序 ≠ 视觉顺序，必须按 rect.top 找视觉顶部那张卡，不能按 DOM 顺序取第一个。
     // 选「top 最接近 scrollerTop」而非「top 最小」：避免选中只露 1px 的 sliver；
     // 恢复后锚点卡 top≈0、|top-scrollerTop|≈0 恒最小，多次翻转置顶卡稳定、不在两列间漂。
-    for (const el of wrapEl.querySelectorAll('[data-id]')) {
+    for (const el of wrapEl.querySelectorAll(CARD_ID_SELECTOR)) {
       const rect = el.getBoundingClientRect()
       if (rect.bottom <= scrollerTop) continue // 完全在视口上方
       const dist = Math.abs(rect.top - scrollerTop)
@@ -27,14 +28,14 @@ export function useScrollAnchor({ wrapRef, isNarrow }) {
         anchorEl = el
       }
     }
-    return anchorEl?.dataset.id ?? null
+    return anchorEl?.id ?? null
   }
 
   function restore(id) {
     if (id == null) return
     const wrapEl = wrapRef.value
     if (!wrapEl) return
-    const el = wrapEl.querySelector(`[data-id="${id}"]`)
+    const el = document.getElementById(id)
     if (!el) return
     const scroller = resolveScrollRoot(wrapEl)
     const scrollerTop = scroller ? scroller.getBoundingClientRect().top : 0
