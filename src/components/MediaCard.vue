@@ -63,6 +63,8 @@ const failed = ref(false)
   gap: 4px;
 }
 
+/* 文字区行数必须 clamp 固定（标题 1 行省略、描述 2 行省略），
+   否则文字换行会让卡片高度漂移，破坏 HEIGHT 常量与真实渲染高度逐像素一致的前提（设计文档 §5）。 */
 .card__title {
   margin: 0;
   font-size: 14px;
@@ -85,7 +87,10 @@ const failed = ref(false)
   overflow: hidden;
 }
 
-/* 高度变体：整体高度必须严格等于 HEIGHT，供 Grid span 精确对齐 */
+/* 高度变体：整体高度必须严格等于 HEIGHT，供 Grid span 精确对齐。
+   必须显式设 height 而非靠内容自然撑高——卡片 = 图片 + 文字 + padding，
+   自然撑高很可能 ≠ HEIGHT，长列表下两列会悄悄错位。显式 height 把「逐像素一致」
+   从假设变成硬保证（设计文档 §5）。 */
 .card--small   { height: 110px; flex-direction: row; }
 .card--medium  { height: 150px; flex-direction: row; }
 .card--large   { height: 230px; }

@@ -60,6 +60,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="cards-page">
+    <!-- 关键：单 v-for + CSS Grid，列数交给 CSS（.is-single 只改 grid-template-columns）。
+         绝不能 v-if/v-else 切列、拆两个 v-for、或给 key 加 L-/R- 前缀——这些都会让 Vue
+         在切换/跨列时销毁并重建卡片，导致 IntersectionObserver 等监听方持有的元素引用失效、漏卡。
+         key 恒为 item.id，单列↔双列切换不重建、不移动任何卡片（设计文档 §6.4）。 -->
     <div ref="wrapRef" class="feed" :class="{ 'is-single': isNarrow }">
       <MediaCard
         v-for="it in items"
